@@ -14,6 +14,11 @@ app.use(express.json());
 app.use("/api/scanResume", resumeRouter);
 app.use("/api/submitVerification", verificationRouter);
 
+// Basic health check route
+app.get("/", (req, res) => {
+  res.send("BlockCredAI Backend is running!");
+});
+
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
