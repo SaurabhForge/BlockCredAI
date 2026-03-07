@@ -81,3 +81,21 @@ cd frontend
 npm run dev
 # Open http://localhost:3000 in your browser to view the application
 ```
+
+---
+
+## 🛠 Troubleshooting Common Issues
+
+### 1. "Connect Wallet" button not working (Connection Failed)
+**Issue:** You click the button to connect your wallet, but you receive a `Connection Failed` error or a `MetaMask not found` error.
+**Fix:**
+- You must have a Web3 Wallet extension installed in your browser, such as **[MetaMask](https://metamask.io/download/)**.
+- Once installed, the app will automatically request MetaMask to connect and will attempt to add the `Hardhat Localhost 8545` network to your wallet so you can test seamlessly. Make sure to click **Approve** and **Switch Network** when prompted by MetaMask.
+
+### 2. Ethers-User-Denied / Action Rejected Error
+**Issue:** You receive an error saying the connection request was cancelled or rejected.
+**Fix:** This happens if you accidentally click outside of the MetaMask popup or click "Cancel" when it asks for connection permissions. Click "Connect Wallet" again and ensure you explicitly press **"Connect"** inside the MetaMask extension window.
+
+### 3. AI Service "Internal Server Error" (Port 8001 failing to start)
+**Issue:** The frontend scanner throws an Internal Server Error, or `uvicorn app:app` fails during Step 5.
+**Fix:** The AI service requires a Python environment. If you don't have Python installed, the backend will automatically catch the connection failure and return a **Graceful Mock Response** so that you can still test the frontend and blockchain components without the AI microservice crashing the app!
