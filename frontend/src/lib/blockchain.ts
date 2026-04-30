@@ -9,10 +9,6 @@ export async function getProviderAndSigner() {
   if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask not found");
   }
-
-  if (!ethers.isAddress(CONTRACT_ADDRESS)) {
-    throw new Error("Smart contract address is not configured.");
-  }
   
   const ethereum = window.ethereum;
   const provider = new ethers.BrowserProvider(ethereum);
@@ -67,6 +63,10 @@ export async function getProviderAndSigner() {
 }
 
 export async function getContractWithSigner() {
+  if (!ethers.isAddress(CONTRACT_ADDRESS)) {
+    throw new Error("Smart contract address is not configured.");
+  }
+
   const { signer } = await getProviderAndSigner();
   return new ethers.Contract(CONTRACT_ADDRESS, blockCredAiAbi, signer);
 }
