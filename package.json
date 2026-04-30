@@ -2,5 +2,9 @@
   "name": "blockcredai",
   "version": "1.0.0",
   "description": "Decentralized Employment Verification with AI Fraud Detection",
-  "private": true
+  "private": true,
+  "scripts": {
+    "test": "npm --prefix backend test && npm --prefix blockchain test && npm --prefix frontend run typecheck",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build && npm --prefix blockchain run compile"
+  }
 }

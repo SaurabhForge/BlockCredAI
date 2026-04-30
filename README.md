@@ -17,6 +17,15 @@ cp .env.example .env
 # Edit .env with your specific values provided in .env.example
 ```
 
+For local development, keep `NEXT_PUBLIC_BACKEND_URL=http://localhost:4000`.
+For GCP Cloud Run, set both `GCP_API_URL` and `NEXT_PUBLIC_GCP_API_URL` to the deployed HTTPS backend URL, for example:
+
+```bash
+GCP_API_URL=https://blockcredai-api-REGION.a.run.app
+NEXT_PUBLIC_GCP_API_URL=https://blockcredai-api-REGION.a.run.app
+CORS_ORIGIN=https://your-frontend-domain.com
+```
+
 ### Step 3: Install Dependencies
 
 Open your terminal and run the following commands sequentially:
@@ -99,3 +108,23 @@ npm run dev
 ### 3. AI Service "Internal Server Error" (Port 8001 failing to start)
 **Issue:** The frontend scanner throws an Internal Server Error, or `uvicorn app:app` fails during Step 5.
 **Fix:** The AI service requires a Python environment. If you don't have Python installed, the backend will automatically catch the connection failure and return a **Graceful Mock Response** so that you can still test the frontend and blockchain components without the AI microservice crashing the app!
+
+---
+
+## Quality, Security, and Testing
+
+The project includes safeguards for common review criteria:
+
+- Code quality: centralized backend configuration, typed frontend API results, strict frontend TypeScript, and removal of unused duplicate service code.
+- Security: restricted CORS, request-size limits, PDF-only resume upload validation, simple rate limiting, safer production private-key handling, and standard security headers.
+- Efficiency: API timeouts, bounded upload/body sizes, and lazy blockchain client creation so health checks do not initialize wallets unnecessarily.
+- Testing: backend validation tests and Hardhat smart-contract tests for role control, verification submission, NFT minting, and invalid inputs.
+- Accessibility: semantic form labels, alert/status regions, keyboard focus styles, a skip link, `aria-busy`, and hidden decorative SVGs.
+
+Run the full quality check from the repository root:
+
+```bash
+npm test
+```
+
+The blockchain workspace uses Hardhat 3, which requires Node.js `22.10.0` or newer.

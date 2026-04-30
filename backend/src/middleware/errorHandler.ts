@@ -1,13 +1,28 @@
 import { Request, Response, NextFunction } from "express";
+import { isProduction } from "../config";
+import { AppError } from "../utils/errors";
 
 export function errorHandler(
-  err: any,
+  err: unknown,
   _req: Request,
   res: Response,
   _next: NextFunction
 ) {
   console.error(err);
-  res.status(err.status || 500).json({
-    message: err.message || "Internal server error"
+
+  if (err instanceof AppError) {
+    res.status(err.status).json({ message: err.message });
+    return;
+  }
+
+  if (err instanceof Error) {
+    res.status(500).json({
+      message: isProduction ? "Internal server error" : err.message
+    });
+    return;
+  }
+
+  res.status(500).json({
+    message: "Internal server error"
   });
 }

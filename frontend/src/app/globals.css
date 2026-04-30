@@ -19,3 +19,8 @@ body {
     font-family: 'Inter', sans-serif;
     overflow-x: hidden;
 }
+
+:focus-visible {
+    outline: 3px solid #c4b5fd;
+    outline-offset: 3px;
+}

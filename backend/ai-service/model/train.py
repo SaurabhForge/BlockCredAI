@@ -2,6 +2,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 import joblib
+from pathlib import Path
 
 def main():
     texts = [
@@ -13,12 +14,14 @@ def main():
     labels = [0, 1, 0, 1]  # 0 legit, 1 fraud
 
     pipe = Pipeline([
-        ("tfidf", TfidfVectorizer()),
-        ("clf", LogisticRegression())
+        ("tfidf", TfidfVectorizer(max_features=250, ngram_range=(1, 2))),
+        ("clf", LogisticRegression(random_state=42, max_iter=250))
     ])
     pipe.fit(texts, labels)
 
-    joblib.dump(pipe, "resume_fraud_model.joblib")
+    model_path = Path(__file__).resolve().parent / "resume_fraud_model.joblib"
+    joblib.dump(pipe, model_path)
+    print(f"Model trained and saved to {model_path}")
 
 if __name__ == "__main__":
     main()

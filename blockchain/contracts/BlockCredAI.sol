@@ -29,6 +29,7 @@ contract BlockCredAI is ERC721, AccessControl {
 
   constructor() ERC721("BlockCredAI Employment Badge", "BCAIB") {
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    _grantRole(EMPLOYER_ROLE, msg.sender);
   }
 
   modifier onlyEmployer() {
@@ -48,6 +49,7 @@ contract BlockCredAI is ERC721, AccessControl {
     string calldata ipfsHash
   ) external onlyEmployer returns (uint256) {
     require(employee != address(0), "Invalid employee");
+    require(bytes(jobDetails).length > 0, "Missing job details");
     require(startDate < endDate, "Invalid dates");
 
     _jobCounter++;

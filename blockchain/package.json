@@ -1,6 +1,10 @@
 {
   "name": "blockcredai-blockchain",
   "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.10.0"
+  },
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
@@ -8,10 +12,15 @@
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-ethers": "^4.0.10",
+    "@nomicfoundation/hardhat-node-test-runner": "^3.0.14",
     "@openzeppelin/contracts": "^5.0.0",
-    "hardhat": "^2.22.0",
-    "typescript": "^5.0.0",
-    "ts-node": "^10.0.0"
+    "chai": "^6.2.1",
+    "hardhat": "^3.4.2",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "undici": "^6.24.0"
   }
 }

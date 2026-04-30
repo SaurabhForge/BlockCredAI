@@ -1,16 +1,20 @@
 "use client";
 
 import { ethers } from "ethers";
-const BlockCredAI = require("../../../blockchain/artifacts/contracts/BlockCredAI.sol/BlockCredAI.json");
+import { blockCredAiAbi } from "./blockCredAiAbi";
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
 export async function getProviderAndSigner() {
-  if (typeof window === "undefined" || !(window as any).ethereum) {
+  if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask not found");
   }
+
+  if (!ethers.isAddress(CONTRACT_ADDRESS)) {
+    throw new Error("Smart contract address is not configured.");
+  }
   
-  const ethereum = (window as any).ethereum;
+  const ethereum = window.ethereum;
   const provider = new ethers.BrowserProvider(ethereum);
   
   // 1. Request accounts
@@ -24,9 +28,14 @@ export async function getProviderAndSigner() {
       method: "wallet_switchEthereumChain",
       params: [{ chainId: targetChainId }],
     });
-  } catch (switchError: any) {
+  } catch (switchError: unknown) {
+    const errorCode =
+      typeof switchError === "object" && switchError !== null && "code" in switchError
+        ? Number((switchError as { code: number }).code)
+        : undefined;
+
     // This error code indicates that the chain has not been added to MetaMask.
-    if (switchError.code === 4902) {
+    if (errorCode === 4902) {
       try {
         await ethereum.request({
           method: "wallet_addEthereumChain",
@@ -59,5 +68,5 @@ export async function getProviderAndSigner() {
 
 export async function getContractWithSigner() {
   const { signer } = await getProviderAndSigner();
-  return new ethers.Contract(CONTRACT_ADDRESS, BlockCredAI.abi, signer);
+  return new ethers.Contract(CONTRACT_ADDRESS, blockCredAiAbi, signer);
 }

@@ -1,25 +1,53 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import resumeRouter from "./routes/resume";
 import verificationRouter from "./routes/verification";
+import { config, getAllowedOrigins } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
+import { rateLimiter } from "./middleware/rateLimiter";
 
-dotenv.config();
 const app = express();
+const allowedOrigins = new Set(getAllowedOrigins());
 
-app.use(cors());
-app.use(express.json());
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Origin is not allowed by CORS."));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  })
+);
+app.use(express.json({ limit: config.requestLimit }));
+app.use(rateLimiter);
 
 app.use("/api/scanResume", resumeRouter);
 app.use("/api/submitVerification", verificationRouter);
 
-// Basic health check route
 app.get("/", (req, res) => {
-  res.send("BlockCredAI Backend is running!");
+  res.json({
+    name: "BlockCredAI Backend",
+    status: "ok",
+    apiUrl: config.publicApiUrl
+  });
 });
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Backend listening on ${PORT}`));
+app.listen(config.port, () => {
+  console.info(`Backend listening on ${config.port}`);
+});

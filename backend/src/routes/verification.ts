@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { submitVerification } from "../services/blockchain";
+import { AppError } from "../utils/errors";
+import { requireText, requireUnixTimestamp, requireWalletAddress } from "../utils/validation";
 
 const router = Router();
 
@@ -14,17 +16,30 @@ router.post("/", async (req, res, next) => {
       ipfsHash
     } = req.body;
 
-    if (!employeeAddress || !jobDetails || !startDate || !endDate) {
-      return res.status(400).json({ message: "Missing fields" });
+    if (employerAddress) {
+      requireWalletAddress(employerAddress, "employerAddress");
+    }
+
+    const validatedEmployee = requireWalletAddress(employeeAddress, "employeeAddress");
+    const validatedJobDetails = requireText(jobDetails, "jobDetails", { min: 3, max: 500 });
+    const validatedStartDate = requireUnixTimestamp(startDate, "startDate");
+    const validatedEndDate = requireUnixTimestamp(endDate, "endDate");
+    const validatedIpfsHash =
+      ipfsHash === undefined || ipfsHash === null
+        ? ""
+        : requireText(ipfsHash, "ipfsHash", { min: 1, max: 120 });
+
+    if (validatedStartDate >= validatedEndDate) {
+      throw new AppError("startDate must be earlier than endDate.", 400);
     }
 
     const receipt = await submitVerification(
       employerAddress,
-      employeeAddress,
-      jobDetails,
-      Number(startDate),
-      Number(endDate),
-      ipfsHash || ""
+      validatedEmployee,
+      validatedJobDetails,
+      validatedStartDate,
+      validatedEndDate,
+      validatedIpfsHash
     );
     res.json({
       txHash: receipt.hash,
