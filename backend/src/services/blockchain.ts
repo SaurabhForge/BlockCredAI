@@ -1,8 +1,7 @@
 import { ethers } from "ethers";
 import { config, isProduction } from "../config";
 import { AppError } from "../utils/errors";
-
-const BlockCredAIArtifact = require("../../../blockchain/artifacts/contracts/BlockCredAI.sol/BlockCredAI.json");
+import { blockCredAiAbi } from "./blockCredAiAbi";
 
 export type JobRecord = {
     jobId: number;
@@ -56,11 +55,11 @@ function getSigner() {
 }
 
 function getReadContract() {
-    return new ethers.Contract(getContractAddress(), BlockCredAIArtifact.abi, getProvider());
+    return new ethers.Contract(getContractAddress(), blockCredAiAbi, getProvider());
 }
 
 function getWriteContract() {
-    return new ethers.Contract(getContractAddress(), BlockCredAIArtifact.abi, getSigner());
+    return new ethers.Contract(getContractAddress(), blockCredAiAbi, getSigner());
 }
 
 function formatJobRecord(record: ChainJobRecord): JobRecord {
