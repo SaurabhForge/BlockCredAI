@@ -40,9 +40,5 @@ export const config = {
 export const isProduction = config.nodeEnv === "production";
 
 export function getAllowedOrigins(): string[] {
-  if (config.allowedOrigins.length > 0) {
-    return config.allowedOrigins;
-  }
-
-  return DEFAULT_ALLOWED_ORIGINS;
+  return Array.from(new Set([...DEFAULT_ALLOWED_ORIGINS, ...config.allowedOrigins]));
 }
