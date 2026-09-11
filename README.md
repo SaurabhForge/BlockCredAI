@@ -93,6 +93,112 @@ npm run dev
 
 ---
 
+## 🚀 Deployment on Render
+
+This project is pre-configured for deployment on **[Render](https://render.com)** using the included Infrastructure-as-Code blueprint (`render.yaml`).
+
+### 🌟 Method 1: 1-Click Blueprint Deployment (Recommended)
+
+1. Navigate to your **[Render Blueprints Dashboard](https://dashboard.render.com/blueprints)**.
+2. Click **New Blueprint Instance** (or **New +** → **Blueprint**).
+3. Connect your GitHub repository: **`SaurabhForge/BlockCredAI`**.
+4. Render will read `render.yaml` and configure all 3 microservices automatically:
+   - 🌐 **`blockcredai-frontend`**: Next.js 16 Web Service
+   - ⚙️ **`blockcredai-backend`**: Node.js/Express API & PDF verification service
+   - 🧠 **`blockcredai-ai`**: FastAPI Python fraud detection service
+5. Click **Apply**. Render will build and deploy all services in parallel!
+
+---
+
+### 🛠️ Method 2: Manual Web Service Deployment
+
+If you prefer deploying services individually in the Render Dashboard:
+
+#### 1. Backend API (`blockcredai-backend`)
+* **Type**: Web Service
+* **Root Directory**: `backend`
+* **Runtime**: `Node`
+* **Build Command**: `npm install --include=dev --legacy-peer-deps && npm run build`
+* **Start Command**: `npm start`
+* **Plan**: `Free`
+* **Environment Variables**:
+  ```env
+  NODE_VERSION=22.14.0
+  NODE_ENV=production
+  PORT=10000
+  CORS_ORIGIN=*
+  AI_URL=https://blockcredai-ai.onrender.com/predict
+  RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+  BLOCKCRED_CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+  ```
+
+#### 2. Frontend Web App (`blockcredai-frontend`)
+* **Type**: Web Service
+* **Root Directory**: `frontend`
+* **Runtime**: `Node`
+* **Build Command**: `npm install --include=dev --legacy-peer-deps && npm run build`
+* **Start Command**: `npm start`
+* **Plan**: `Free`
+* **Environment Variables**:
+  ```env
+  NODE_VERSION=22.14.0
+  NODE_ENV=production
+  NEXT_PUBLIC_BACKEND_URL=https://blockcredai-backend.onrender.com
+  ```
+
+#### 3. AI Service (`blockcredai-ai`)
+* **Type**: Web Service
+* **Root Directory**: `backend/ai-service`
+* **Runtime**: `Python`
+* **Build Command**: `pip install --no-cache-dir -r requirements.txt`
+* **Start Command**: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+* **Plan**: `Free`
+* **Environment Variables**:
+  ```env
+  PYTHON_VERSION=3.11.9
+  ```
+
+---
+
+### 📡 Render Production API Endpoints
+
+Once deployed on Render, the backend serves the following production endpoints:
+
+| Endpoint | Method | Content-Type | Description |
+|---|---|---|---|
+| `/` | `GET` | `application/json` | Service health status & metadata |
+| `/api/scanResume` | `POST` | `multipart/form-data` | Uploads PDF resume, queries blockchain for verified history, runs AI fraud model, returns risk score & on-chain records |
+| `/api/submitVerification` | `POST` | `application/json` | Mints ERC-721 badge NFT & writes verified employment record to smart contract |
+
+#### Example cURL Request:
+```bash
+curl -X POST https://blockcredai-backend.onrender.com/api/scanResume \
+  -F "resume=@resume.pdf;type=application/pdf" \
+  -F "walletAddress=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" \
+  -F "claimedExperience=Full Stack Engineer at StartupXYZ"
+```
+
+Full OpenAPI 3.0 specification is available in [`openapi.json`](./openapi.json).
+
+---
+
+### 🤖 Chrome E2E Automation Testing
+
+The repository includes a complete automated testing suite powered by Playwright and Chrome:
+
+```bash
+# Run full visual Chrome automation (submits on-chain record + scans candidate):
+npm run automate
+
+# Run full headed Playwright test suite (5 passing scenarios):
+npm run test:e2e:headed
+
+# Open interactive Playwright UI:
+npm run test:e2e:ui
+```
+
+---
+
 ## 🛠 Troubleshooting Common Issues
 
 ### 1. "Connect Wallet" button not working (Connection Failed)
