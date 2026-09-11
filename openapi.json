@@ -1,0 +1,180 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BlockCredAI API",
+    "version": "1.0.0",
+    "description": "Full REST API specification for BlockCredAI — AI-powered fraud detection & blockchain credential verification."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000",
+      "description": "Local Development Server"
+    },
+    {
+      "url": "https://blockcredai-backend.onrender.com",
+      "description": "Render Production Server"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Health Check & Service Status",
+        "description": "Returns backend status and service configuration.",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "example": {
+                  "name": "BlockCredAI Backend",
+                  "status": "ok",
+                  "apiUrl": "https://blockcredai-backend.onrender.com"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scanResume": {
+      "post": {
+        "summary": "Scan Resume for Fraud & Query On-Chain Records",
+        "description": "Parses the uploaded PDF resume, queries the smart contract for on-chain verified employment records, computes keyword mismatches, and runs the AI fraud model.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["resume", "walletAddress", "claimedExperience"],
+                "properties": {
+                  "resume": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Resume file in PDF format (max 2MB)"
+                  },
+                  "walletAddress": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "example": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+                    "description": "Candidate Ethereum wallet address"
+                  },
+                  "claimedExperience": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 2000,
+                    "example": "Full Stack Engineer at StartupXYZ — Built customer dashboard with Next.js",
+                    "description": "Candidate claimed work history and experience summary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resume analysis completed successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "fraudProbability": 0.45,
+                  "explanation": "Base model risk 0.45, 0 unverified claims boosting risk.",
+                  "onChainJobs": [
+                    {
+                      "jobId": 4,
+                      "employer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+                      "employee": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+                      "jobDetails": "Full Stack Engineer at StartupXYZ — Built customer dashboard with Next.js",
+                      "startDate": 1583020800,
+                      "endDate": 1664496000,
+                      "ipfsHash": "",
+                      "tokenId": 4
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or unreadable PDF",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Resume PDF could not be read. Please upload a text-based PDF."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/submitVerification": {
+      "post": {
+        "summary": "Submit Verified Employment Record to Blockchain",
+        "description": "Mints an employment verification badge NFT and stores the job record in the smart contract.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["employeeAddress", "jobDetails", "startDate", "endDate"],
+                "properties": {
+                  "employerAddress": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "description": "Optional employer address"
+                  },
+                  "employeeAddress": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$",
+                    "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                    "description": "Candidate / Employee Ethereum address"
+                  },
+                  "jobDetails": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500,
+                    "example": "Senior Software Engineer at TechCorp",
+                    "description": "Job title, company, and responsibilities"
+                  },
+                  "startDate": {
+                    "type": "integer",
+                    "example": 1622505600,
+                    "description": "Employment start date as Unix timestamp (seconds)"
+                  },
+                  "endDate": {
+                    "type": "integer",
+                    "example": 1693440000,
+                    "description": "Employment end date as Unix timestamp (seconds)"
+                  },
+                  "ipfsHash": {
+                    "type": "string",
+                    "example": "",
+                    "description": "Optional IPFS hash for credential documents"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record submitted on-chain and NFT minted",
+            "content": {
+              "application/json": {
+                "example": {
+                  "txHash": "0x70775e3fcf390c26a4b0f9ac3c39dedda9a253ed04563d5a805321e3f335cb64",
+                  "status": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid dates or invalid address parameters"
+          }
+        }
+      }
+    }
+  }
+}
