@@ -8,7 +8,8 @@
     "build": "npm --prefix backend run build && npm --prefix frontend run build && npm --prefix blockchain run compile",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
-    "test:e2e:ui": "npx playwright test --ui"
+    "test:e2e:ui": "npx playwright test --ui",
+    "automate": "node scripts/run-chrome-automation.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
