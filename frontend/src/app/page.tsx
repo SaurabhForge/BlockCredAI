@@ -2,6 +2,7 @@
 
 import WalletConnectButton from "../components/WalletConnectButton";
 import ResumeUpload from "../components/ResumeUpload";
+import SubmitVerification from "../components/SubmitVerification";
 import Image from "next/image";
 
 export default function Home() {
@@ -44,24 +45,49 @@ export default function Home() {
                     </p>
                 </div>
 
-                {/* Verification App Container */}
-                <div className="w-full max-w-lg glass rounded-2xl p-8 shadow-2xl shadow-indigo-900/20 mb-24 relative overflow-hidden">
-                    {/* Subtle glow effect behind the card */}
-                    <div aria-hidden="true" className="absolute -top-32 -left-32 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl mix-blend-screen"></div>
-                    <div aria-hidden="true" className="absolute -bottom-32 -right-32 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl mix-blend-screen"></div>
+                {/* Verification App Container — two cards side by side */}
+                <div className="w-full max-w-4xl flex flex-col lg:flex-row gap-6 mb-24">
 
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-8 border-b border-indigo-500/20 pb-4">
-                            <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
-                                <svg className="w-6 h-6 text-indigo-400" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                </svg>
+                    {/* ── AI Resume Scanner ── */}
+                    <div className="flex-1 glass rounded-2xl p-8 shadow-2xl shadow-indigo-900/20 relative overflow-hidden">
+                        <div aria-hidden="true" className="absolute -top-32 -left-32 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl mix-blend-screen"></div>
+                        <div aria-hidden="true" className="absolute -bottom-32 -right-32 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl mix-blend-screen"></div>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-3 mb-8 border-b border-indigo-500/20 pb-4">
+                                <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
+                                    <svg className="w-6 h-6 text-indigo-400" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-semibold text-white tracking-wide">AI Resume Scanner</h2>
+                                    <p className="text-xs text-indigo-300/60 mt-0.5">Scan a candidate&apos;s resume for fraud</p>
+                                </div>
                             </div>
-                            <h2 className="text-xl font-semibold text-white tracking-wide">AI Resume Scanner</h2>
+                            <ResumeUpload />
                         </div>
-
-                        <ResumeUpload />
                     </div>
+
+                    {/* ── Employer: Submit Verification ── */}
+                    <div className="flex-1 glass rounded-2xl p-8 shadow-2xl shadow-emerald-900/20 relative overflow-hidden">
+                        <div aria-hidden="true" className="absolute -top-32 -right-32 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl mix-blend-screen"></div>
+                        <div aria-hidden="true" className="absolute -bottom-32 -left-32 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl mix-blend-screen"></div>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-3 mb-8 border-b border-emerald-500/20 pb-4">
+                                <div className="p-2 bg-emerald-500/10 rounded-lg shrink-0">
+                                    <svg className="w-6 h-6 text-emerald-400" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-semibold text-white tracking-wide">Submit Employment Record</h2>
+                                    <p className="text-xs text-emerald-300/60 mt-0.5">Employers: register a job on-chain</p>
+                                </div>
+                            </div>
+                            <SubmitVerification />
+                        </div>
+                    </div>
+
                 </div>
 
                 {/* Founder Section */}

@@ -25,9 +25,9 @@ router.post("/", async (req, res, next) => {
     const validatedStartDate = requireUnixTimestamp(startDate, "startDate");
     const validatedEndDate = requireUnixTimestamp(endDate, "endDate");
     const validatedIpfsHash =
-      ipfsHash === undefined || ipfsHash === null
+      !ipfsHash || typeof ipfsHash !== "string" || ipfsHash.trim() === ""
         ? ""
-        : requireText(ipfsHash, "ipfsHash", { min: 1, max: 120 });
+        : requireText(ipfsHash.trim(), "ipfsHash", { min: 1, max: 120 });
 
     if (validatedStartDate >= validatedEndDate) {
       throw new AppError("startDate must be earlier than endDate.", 400);
