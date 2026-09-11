@@ -1,0 +1,51 @@
+services:
+  # ── 1. AI Fraud Detection Service (FastAPI / Python) ─────────────────────────
+  - type: web
+    name: blockcredai-ai
+    runtime: python
+    rootDir: backend/ai-service
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+  # ── 2. Backend API Service (Node.js / Express) ────────────────────────────────
+  - type: web
+    name: blockcredai-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: AI_URL
+        value: https://blockcredai-ai.onrender.com/predict
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: RPC_URL
+        value: https://ethereum-sepolia-rpc.publicnode.com
+      - key: BLOCKCRED_CONTRACT_ADDRESS
+        value: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+
+  # ── 3. Frontend Web Application (Next.js) ────────────────────────────────────
+  - type: web
+    name: blockcredai-frontend
+    runtime: node
+    rootDir: frontend
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_BACKEND_URL
+        value: https://blockcredai-backend.onrender.com

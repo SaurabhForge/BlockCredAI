@@ -21,7 +21,13 @@ app.use((_req, res, next) => {
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.has("*") ||
+        allowedOrigins.has(origin) ||
+        origin.endsWith(".onrender.com") ||
+        origin.endsWith(".run.app")
+      ) {
         callback(null, true);
         return;
       }
