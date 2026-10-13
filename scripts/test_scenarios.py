@@ -1,5 +1,5 @@
 """
-Simulate the full resume.ts logic in Python to verify all 4 scenarios.
+Simulate the updated resume.ts logic in Python to verify all 4 scenarios.
 """
 import urllib.request, json, re
 
@@ -15,7 +15,7 @@ def ai_predict(resume_text, claimed_experience, mismatches):
     with urllib.request.urlopen(req, timeout=5) as r:
         return json.loads(r.read())
 
-def count_specific_claims(text):
+def count_specific_employment_claims(text):
     lower = text.lower()
     patterns = [
         r'(worked|employed|working|interned|serving)\s+(at|for|with|in)\s+[a-z0-9]',
@@ -34,62 +34,71 @@ MATCH_STOPWORDS = {
     "working", "with", "from", "have", "having", "team", "role", "position",
     "company", "firm", "organization", "using", "responsible", "developed",
     "managed", "built", "designed", "created", "leading", "senior", "junior",
-    "multiple", "various", "overall", "total", "more", "than", "over",
+    "multiple", "various", "overall", "total", "more", "than", "over", "into",
+    "also", "such", "this", "that", "were", "been"
 }
 
-def identity_tokens(text):
+def to_identity_tokens(text):
     return [t for t in re.split(r'[^a-z0-9]+', text.lower())
-            if len(t) >= 4 and t not in MATCH_STOPWORDS]
+            if len(t) >= 3 and t not in MATCH_STOPWORDS]
+
+def is_claim_verified_by_on_chain_records(claimed_experience, resume_text, verified_jobs):
+    if not verified_jobs:
+        return False
+
+    combined = f"{claimed_experience} {resume_text}".lower()
+    candidate_tokens = set(to_identity_tokens(combined))
+
+    for job_details in verified_jobs:
+        job_lower = job_details.lower().strip()
+        if not job_lower:
+            continue
+
+        # 1. Substring match
+        if job_lower in combined or claimed_experience.lower().strip() in job_lower:
+            return True
+
+        # 2. Token overlap analysis
+        job_tokens = list(set(to_identity_tokens(job_lower)))
+        if not job_tokens:
+            continue
+
+        matched_tokens = [t for t in job_tokens if t in candidate_tokens or t in combined]
+
+        if len(matched_tokens) / len(job_tokens) >= 0.5:
+            return True
+
+        if len(matched_tokens) >= 2:
+            return True
+
+    return False
 
 def simulate_resume_route(resume_text, claimed_experience, on_chain_history):
-    """Mirrors the updated resume.ts logic exactly."""
-    if len(on_chain_history) == 0:
-        mismatches = count_specific_claims(claimed_experience)
-    else:
-        norm_claim = claimed_experience.lower()
-        verified_text = " ".join(j.lower() for j in on_chain_history)
-        keywords = identity_tokens(norm_claim)
-        verified_kw = set(identity_tokens(verified_text))
-        unmatched = [t for t in keywords if t not in verified_kw and t not in verified_text]
-        if not unmatched:
-            mismatches = 0
-        else:
-            ratio = len(unmatched) / max(1, len(keywords))
-            mismatches = 1 if ratio < 0.5 else (2 if ratio < 0.75 else 4)
+    has_records = len(on_chain_history) > 0
+    is_verified = has_records and is_claim_verified_by_on_chain_records(claimed_experience, resume_text, on_chain_history)
+    claim_count = count_specific_employment_claims(claimed_experience)
 
+    mismatches = claim_count if not has_records else (0 if is_verified else 1)
     ai = ai_predict(resume_text, claimed_experience, mismatches)
-    prob = ai["fraud_probability"]
-    explanation = ai["explanation"]
 
-    # Post-processing
-    if len(on_chain_history) == 0:
-        claim_count = count_specific_claims(claimed_experience)
-        if claim_count > 0:
-            prob = 1.0
-            explanation = (
-                f"100% Fraud Detected: No blockchain-verified employment records found for this candidate. "
-                f"Candidate claims {claim_count} specific employment position(s) with zero on-chain verification."
-            )
-        else:
-            prob = ai["fraud_probability"]
-            explanation = f"No on-chain corporate records found. Entry-level applicant; low fraud risk ({round(prob * 100)}%)."
-    elif mismatches == 0:
-        if ai["fraud_probability"] <= 0.5:
+    if has_records:
+        if is_verified:
             prob = 0.0
             explanation = f"Verified on-chain: 0% fraud risk. All claims match {len(on_chain_history)} record(s)."
         else:
-            prob = max(0, round((ai["fraud_probability"] - 0.3) * 100) / 100)
-            explanation = f"Partially verified on-chain ({len(on_chain_history)} record(s)), unusual wording."
+            prob = 1.0
+            explanation = f"100% Fraud Detected: Critical mismatch with blockchain employment records ({len(on_chain_history)} record(s))."
     else:
-        prob = 1.0
-        explanation = (
-            f"100% Fraud Detected: Critical mismatch with blockchain employment records. "
-            f"Candidate claims employment that contradicts or does not match their {len(on_chain_history)} verified on-chain record(s)."
-        )
-
-    if ai["fraud_probability"] >= 0.8:
-        prob = 1.0
-        explanation = "100% Fraud Detected: AI analysis identified severe fraudulent patterns or fabricated credentials."
+        if claim_count > 0:
+            prob = 1.0
+            explanation = f"100% Fraud Detected: No blockchain-verified records found for {claim_count} specific claim(s)."
+        else:
+            if ai["fraud_probability"] >= 0.8:
+                prob = 1.0
+                explanation = "100% Fraud Detected: AI analysis identified severe fraudulent patterns."
+            else:
+                prob = ai["fraud_probability"]
+                explanation = f"No on-chain records. Entry-level applicant; low fraud risk ({round(prob*100)}%)."
 
     return round(prob, 2), explanation
 
@@ -101,6 +110,13 @@ cases = [
         "resume_text": "Software Engineer at Google from 2019 to 2022 working on distributed systems",
         "claimed_experience": "Software engineer at Google 3 years",
         "on_chain": ["Software Engineer at Google 2019-2022 distributed systems Kubernetes"],
+        "expect": 0.0,
+    },
+    {
+        "label": "LEGIT - Detailed claim, short on-chain title",
+        "resume_text": "Worked at Google as a Software Engineer developing backend services and REST APIs",
+        "claimed_experience": "Worked at Google as a Software Engineer from 2020 to 2022 building backend services",
+        "on_chain": ["Software Engineer at Google"],
         "expect": 0.0,
     },
     {
@@ -126,13 +142,13 @@ cases = [
     },
 ]
 
-print(f"{'Scenario':<52} {'Risk%':>6}  {'Expected%':>10}  Verdict")
-print("-" * 80)
+print(f"{'Scenario':<54} {'Risk%':>6}  {'Expected%':>10}  Verdict")
+print("-" * 85)
 for c in cases:
     prob, expl = simulate_resume_route(c["resume_text"], c["claimed_experience"], c["on_chain"])
     pct = f"{prob*100:.0f}%"
     exp_pct = f"{c['expect']*100:.0f}%"
     verdict = "PASS" if prob == c["expect"] or (c["expect"] == 0.0 and prob <= 0.05) else "FAIL"
-    print(f"{c['label']:<52} {pct:>6}  {exp_pct:>10}  {verdict}")
+    print(f"{c['label']:<54} {pct:>6}  {exp_pct:>10}  {verdict}")
     print(f"   -> {expl}")
     print()
