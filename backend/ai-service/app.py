@@ -20,6 +20,16 @@ class FraudResponse(BaseModel):
     explanation: str
 
 
+@app.get("/")
+def root():
+    return {
+        "service": "BlockCredAI Fraud Detector",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model_loaded": MODEL_PATH.exists()}
