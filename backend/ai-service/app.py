@@ -29,23 +29,30 @@ def health():
 def predict(payload: ResumePayload):
     base_prob = float(model.predict_proba([payload.resume_text])[0][1])
 
-    # Add mismatch penalty: each unverified claim adds 12% risk, capped at +48%
-    mismatch_boost = min(0.48, 0.12 * payload.unverified_mismatches)
-    fraud_prob = min(1.0, base_prob + mismatch_boost)
-
-    # Build explanation
-    if fraud_prob < 0.2:
-        explanation = "Low fraud risk: Resume text patterns are consistent with legitimate professional experience."
-    elif fraud_prob < 0.5:
+    # If any unverified mismatch exists against blockchain truth, it is 100% fraud
+    if payload.unverified_mismatches > 0:
+        fraud_prob = 1.0
         explanation = (
-            f"Moderate risk detected (base score: {base_prob:.0%}). "
-            f"Resume contains some unusual patterns; recommend manual review."
+            f"100% Fraud Detected: {payload.unverified_mismatches} unverified employment "
+            f"claim mismatch(es) detected against blockchain ground truth."
+        )
+    elif base_prob >= 0.80:
+        fraud_prob = 1.0
+        explanation = (
+            f"100% Fraud Detected: AI text model identified severe fraudulent patterns, "
+            f"impossible career timelines, or fabricated credentials."
+        )
+    elif base_prob < 0.20:
+        fraud_prob = 0.0
+        explanation = (
+            "0% Fraud Risk: Resume text patterns are consistent with legitimate "
+            "professional experience with zero unverified claims."
         )
     else:
+        fraud_prob = round(base_prob, 2)
         explanation = (
-            f"High fraud risk (base score: {base_prob:.0%}"
-            + (f", {payload.unverified_mismatches} unverified claim(s) adding {mismatch_boost:.0%} penalty" if mismatch_boost > 0 else "")
-            + "). Resume text contains patterns strongly associated with fraudulent claims."
+            f"Moderate risk ({base_prob:.0%}): Resume contains unusual text patterns; "
+            f"manual review recommended."
         )
 
     return FraudResponse(

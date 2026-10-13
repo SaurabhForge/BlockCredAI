@@ -68,12 +68,13 @@ async function extractResumeText(file: Express.Multer.File): Promise<string> {
 function countSpecificEmploymentClaims(text: string): number {
   const lower = text.toLowerCase();
   const patterns: RegExp[] = [
-    /worked\s+(at|for|with)\s+\w/g,                     // "worked at Infosys"
-    /employed\s+(at|by)\s+\w/g,                          // "employed at TCS"
-    /\d+\s*(year|month)s?\s+(at|of|experience)/g,        // "3 years at Google"
-    /(engineer|developer|manager|analyst|lead|director|consultant|executive|officer|intern)\s+at\s+\w/g,
-    /joined\s+\w/g,                                       // "joined Wipro"
-    /\bat\s+[A-Z][a-zA-Z]{2,}/g,                        // "at Microsoft", "at IBM"
+    /(worked|employed|working|interned|serving)\s+(at|for|with|in)\s+[a-z0-9]/g,
+    /(engineer|developer|manager|analyst|lead|director|consultant|executive|officer|intern|architect|designer|associate)\s+(at|for|in|with)\s+[a-z0-9]/g,
+    /\bat\s+[a-z0-9]{3,}/g,
+    /\d+\s*(year|month|yr)s?\s*(of\s*)?(experience|at|in)/g,
+    /(engineer|developer|manager|analyst|lead|director|consultant|executive|intern)\s*[,:\-–]\s*[a-z0-9]/g,
+    /20\d\d\s*[-–to]+\s*(20\d\d|present|current)/g,
+    /(company|employer|organization)\s*[:=]\s*[a-z0-9]/g,
   ];
   let total = 0;
   for (const pattern of patterns) {
@@ -154,21 +155,22 @@ router.post(
         const claimCount = countSpecificEmploymentClaims(claimedExperience);
 
         if (claimCount > 0) {
-          // Person is making specific employment claims but has ZERO verified
-          // blockchain records — floor fraud probability at 75%.
-          finalFraudProbability = Math.max(finalFraudProbability, 0.75);
+          // Candidate asserts specific past employment, but has ZERO verified
+          // records on-chain (person did not work there / unverified claim) -> 100% Fraud
+          finalFraudProbability = 1.0;
           finalExplanation =
-            `High risk: No blockchain-verified employment records found for this wallet address. ` +
-            `The candidate is asserting ${claimCount} specific employment claim(s) with no ` +
-            `cryptographic backing. Claims cannot be confirmed without an employer minting a verified badge.`;
+            `100% Fraud Detected: No blockchain-verified employment records found for this candidate. ` +
+            `The candidate claims ${claimCount} specific past employment position(s), but there is zero ` +
+            `cryptographic verification on-chain confirming they worked there.`;
         } else {
-          // Fresher or no specific employment claims — rely on AI text score only
+          // Fresher or no specific corporate claims — rely on AI text score only
+          finalFraudProbability = aiResult.fraud_probability;
           finalExplanation =
-            `No on-chain employment records found for this wallet. ` +
-            `No specific employment claims detected; AI text analysis: ${aiResult.explanation}`;
+            `No on-chain corporate records found. Candidate is an entry-level applicant with no ` +
+            `previous employment claims. AI text analysis indicates low fraud risk (${Math.round(aiResult.fraud_probability * 100)}%).`;
         }
       } else if (mismatches === 0) {
-        // Records exist and everything matches — fully verified
+        // Records exist and all claims match on-chain verified records -> 0% Fraud
         if (aiResult.fraud_probability <= 0.5) {
           finalFraudProbability = 0;
           finalExplanation =
@@ -181,12 +183,20 @@ router.post(
             `but resume wording contains unusual patterns.`;
         }
       } else {
-        // Records exist but claims don't align with them — floor at 60%
-        finalFraudProbability = Math.max(finalFraudProbability, 0.60);
+        // Records exist but candidate claims employment that DOES NOT match verified records -> 100% Fraud
+        finalFraudProbability = 1.0;
         finalExplanation =
-          `Mismatch detected: ${onChainHistory.length} blockchain record(s) found but ` +
-          `the claimed experience does not align with the verified on-chain data. ` +
-          aiResult.explanation;
+          `100% Fraud Detected: Critical mismatch with blockchain employment records. ` +
+          `Candidate claims employment that contradicts or does not match their ` +
+          `${onChainHistory.length} verified on-chain record(s).`;
+      }
+
+      // If AI detects severe fraudulent text (impossible timeline, extreme inflation)
+      if (aiResult.fraud_probability >= 0.8) {
+        finalFraudProbability = 1.0;
+        finalExplanation =
+          `100% Fraud Detected: AI analysis identified severe fraudulent patterns, ` +
+          `impossible career timelines, or fabricated credentials in the resume text.`;
       }
 
       res.json({
