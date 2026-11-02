@@ -90,52 +90,6 @@ export default function Home() {
 
                 </div>
 
-                {/* Founder Section */}
-                <div className="w-full max-w-4xl pt-16 border-t border-white/10">
-                    <div className="text-center mb-12">
-                        <h3 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-100 to-gray-400">
-                            Meet the Founder
-                        </h3>
-                        <div className="h-1 w-20 bg-indigo-500 rounded-full mx-auto mt-4 opacity-50"></div>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row items-center gap-10 glass p-8 rounded-3xl mx-auto relative overflow-hidden group">
-                        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div className="shrink-0 relative z-10 flex flex-col items-center">
-                            <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-indigo-500/30 shadow-2xl relative">
-                                {/* Fallback image placeholder assuming user moves their provided image to public directory */}
-                                <Image
-                                    src="/founder.jpg"
-                                    alt="Saurabh Kumar - Founder"
-                                    fill
-                                    unoptimized
-                                    className="object-cover hover:scale-105 transition-transform duration-500"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://ui-avatars.com/api/?name=Saurabh+Kumar&background=4f46e5&color=fff&size=200";
-                                    }}
-                                />
-                            </div>
-                            <div className="mt-4 px-4 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold uppercase tracking-widest border border-indigo-500/30">
-                                Founder & Lead Developer
-                            </div>
-                        </div>
-                        <div className="text-center md:text-left relative z-10 flex-1">
-                            <h4 className="text-2xl font-bold text-white mb-2">Saurabh Kumar</h4>
-                            <p className="text-indigo-200 mb-4 font-medium flex items-center justify-center md:justify-start gap-2">
-                                <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                                </svg>
-                                Visionary Engineer
-                            </p>
-                            <p className="text-gray-400 leading-relaxed text-sm md:text-base">
-                                Passionate about merging decentralized technologies with artificial intelligence to solve real-world problems.
-                                Saurabh created BlockCredAI to tackle resume fraud and build a transparent, tamper-proof ecosystem for
-                                employment verification. Driven by a commitment to ethical AI and open web principles.
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </main>
 
             {/* Footer */}
