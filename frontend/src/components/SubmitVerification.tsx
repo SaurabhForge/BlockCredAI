@@ -65,9 +65,18 @@ export default function SubmitVerification() {
     <form className="space-y-5" onSubmit={handleSubmit}>
       {/* Employee Wallet */}
       <div>
-        <label htmlFor="sv-employee" className="block text-sm font-medium text-indigo-100 mb-1">
-          Employee Wallet Address
-        </label>
+        <div className="flex justify-between items-center mb-1">
+          <label htmlFor="sv-employee" className="block text-sm font-medium text-indigo-100">
+            Employee Wallet Address
+          </label>
+          <button
+            type="button"
+            onClick={() => setEmployeeAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")}
+            className="text-[11px] text-emerald-300 hover:text-emerald-200 underline decoration-emerald-400/50"
+          >
+            Use Demo Address
+          </button>
+        </div>
         <input
           id="sv-employee"
           type="text"

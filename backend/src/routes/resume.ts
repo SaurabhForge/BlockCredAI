@@ -1,21 +1,15 @@
 import { Router } from "express";
-import multer, { FileFilterCallback } from "multer";
-import { Request } from "express";
-import { config } from "../config";
+import multer from "multer";
+import { AppError } from "../utils/errors";
+import { requireWalletAddress } from "../utils/validation";
 import { getEmployeeHistory } from "../services/blockchain";
 import { getFraudScore } from "../services/aiClient";
-import { AppError } from "../utils/errors";
-import { requireText, requireWalletAddress } from "../utils/validation";
 
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: config.uploadLimitBytes,
-    files: 1
-  },
-  fileFilter(_req: Request, file: Express.Multer.File, callback: FileFilterCallback) {
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  fileFilter: (_req, file, callback) => {
     if (file.mimetype !== "application/pdf") {
-      callback(new AppError("Resume must be uploaded as a PDF file.", 400));
+      callback(new AppError("Only PDF files are supported.", 400));
       return;
     }
     callback(null, true);
@@ -61,89 +55,189 @@ async function extractResumeText(file: Express.Multer.File): Promise<string> {
   }
 }
 
-/**
- * Count how many specific employment assertions exist in the claimed experience text.
- * Returns 0 for freshers/generic text, 1-6 for texts with concrete company/role claims.
- */
-function countSpecificEmploymentClaims(text: string): number {
-  const lower = text.toLowerCase();
-  const patterns: RegExp[] = [
-    /(worked|employed|working|interned|serving)\s+(at|for|with|in)\s+[a-z0-9]/g,
-    /(engineer|developer|manager|analyst|lead|director|consultant|executive|officer|intern|architect|designer|associate)\s+(at|for|in|with)\s+[a-z0-9]/g,
-    /\bat\s+[a-z0-9]{3,}/g,
-    /\d+\s*(year|month|yr)s?\s*(of\s*)?(experience|at|in)/g,
-    /(engineer|developer|manager|analyst|lead|director|consultant|executive|intern)\s*[,:\-–]\s*[a-z0-9]/g,
-    /20\d\d\s*[-–to]+\s*(20\d\d|present|current)/g,
-    /(company|employer|organization)\s*[:=]\s*[a-z0-9]/g,
-  ];
-  let total = 0;
-  for (const pattern of patterns) {
-    total += (lower.match(pattern) ?? []).length;
-  }
-  return Math.min(6, total);
-}
-
-// Words that appear in claims/records but carry no identity value for comparison
-const MATCH_STOPWORDS = new Set([
-  "years", "year", "month", "months", "experience", "work", "worked",
-  "working", "with", "from", "have", "having", "team", "role", "position",
-  "company", "firm", "organization", "using", "responsible", "developed",
-  "managed", "built", "designed", "created", "leading", "senior", "junior",
-  "multiple", "various", "overall", "total", "more", "than", "over", "into",
-  "also", "such", "this", "that", "were", "been"
+// Directory of recognized corporate employers
+const RECOGNIZED_COMPANIES = new Set([
+  // Tech & Cloud Giants
+  "google", "microsoft", "amazon", "apple", "meta", "facebook", "netflix", "openai", "nvidia", "intel",
+  "ibm", "oracle", "cisco", "salesforce", "adobe", "qualcomm", "amd", "uber", "airbnb", "twitter",
+  "linkedin", "spotify", "stripe", "coinbase", "dropbox", "github", "palantir", "snowflake", "databricks",
+  // IT & Global Consulting
+  "tcs", "infosys", "wipro", "hcl", "tech mahindra", "persistent", "cognizant", "accenture", "capgemini",
+  "deloitte", "pwc", "ey", "kpmg", "mckinsey", "bcg", "bain", "slalom",
+  // Asian Tech / Consumer / Fintech
+  "flipkart", "swiggy", "zomato", "razorpay", "paytm", "grab", "gojek", "shopee", "byju", "cred",
+  // Banking & Finance
+  "goldman sachs", "jp morgan", "morgan stanley", "citigroup", "hsbc", "barclays", "standard chartered",
+  // Demo & Testing Companies Seeded on BlockCredAI
+  "techcorp", "innovatelabs", "startupxyz", "financehub", "acme corp"
 ]);
 
-function toIdentityTokens(text: string): string[] {
-  return text
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 3 && !MATCH_STOPWORDS.has(t));
-}
+const NON_COMPANY_WORDS = new Set([
+  "experience", "least", "most", "various", "multiple", "present", "current",
+  "digital", "technical", "scale", "global", "startup", "internship", "intern",
+  "developer", "engineer", "manager", "analyst", "lead", "team", "years", "months",
+  "role", "work", "worked", "working", "position", "company", "firm", "client", "project",
+  "school", "college", "university", "institute", "academy", "camp", "bootcamp",
+  "solutions", "services", "technologies", "software", "development", "systems",
+  "august", "september", "october", "november", "december", "january", "february", "march", "april", "may", "june", "july"
+]);
 
-/**
- * Determine whether candidate's claimed experience matches ANY of their verified on-chain job records.
- */
-function isClaimVerifiedByOnChainRecords(
-  claimedExperience: string,
-  verifiedJobs: { jobDetails: string }[]
-): boolean {
-  if (verifiedJobs.length === 0) return false;
+function extractCompanyFromJobDetails(jobDetails: string): string | null {
+  if (!jobDetails) return null;
 
-  const claimLower = claimedExperience.toLowerCase().trim();
-  const claimTokens = new Set(toIdentityTokens(claimLower));
-
-  for (const job of verifiedJobs) {
-    const jobLower = job.jobDetails.toLowerCase().trim();
-    if (!jobLower) continue;
-
-    // 1. Direct substring match (badge in claim or claim in badge)
-    if (claimLower.includes(jobLower) || jobLower.includes(claimLower)) {
-      return true;
-    }
-
-    const jobTokens = Array.from(new Set(toIdentityTokens(jobLower)));
-    if (jobTokens.length === 0) continue;
-
-    const matchedTokens = jobTokens.filter(
-      (token) => claimTokens.has(token) || claimLower.includes(token)
-    );
-
-    // If at least 40% of the badge tokens appear in candidate's claim
-    if (matchedTokens.length / jobTokens.length >= 0.4) {
-      return true;
-    }
-
-    // Or if at least 2 key tokens match (e.g. role + company)
-    if (matchedTokens.length >= 2) {
-      return true;
+  const lower = jobDetails.toLowerCase();
+  for (const comp of RECOGNIZED_COMPANIES) {
+    if (new RegExp(`\\b${comp}\\b`, "i").test(lower)) {
+      return comp.replace(/\s+/g, "");
     }
   }
 
-  return false;
+  const m = jobDetails.match(/(?:at|for|with|in|@)\s+([A-Za-z0-9&.\-_]+)/i);
+  if (m) {
+    const raw = m[1].toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (raw.length >= 3 && !NON_COMPANY_WORDS.has(raw)) {
+      return raw;
+    }
+  }
+
+  return null;
+}
+
+export type ExtractedProfile = {
+  candidateName: string;
+  primaryRole: string;
+  detectedEmployers: string[];
+  detectedEducation: string;
+  estimatedExperienceYears: number;
+};
+
+/**
+ * Parses structured candidate profile entities from raw resume text.
+ */
+function parseResumeEntities(resumeText: string): ExtractedProfile {
+  const lower = resumeText.toLowerCase();
+
+  // 1. Candidate Name (from top lines)
+  const lines = resumeText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let candidateName = "Candidate";
+  for (const line of lines.slice(0, 5)) {
+    const lLower = line.toLowerCase();
+    if (
+      !lLower.includes("resume") &&
+      !lLower.includes("curriculum") &&
+      !lLower.includes("@") &&
+      !lLower.includes("phone") &&
+      !lLower.includes("http") &&
+      !lLower.includes("experience") &&
+      !lLower.includes("summary") &&
+      !lLower.includes("education") &&
+      line.length >= 3 &&
+      line.length <= 40 &&
+      /^[A-Za-z\s.'-]+$/.test(line)
+    ) {
+      candidateName = line;
+      break;
+    }
+  }
+
+  // 2. Primary Role
+  const roles = [
+    "Full Stack Engineer", "Senior Software Engineer", "Software Engineer",
+    "Frontend Developer", "Backend Developer", "DevOps Engineer",
+    "Data Scientist", "Machine Learning Engineer", "AI Engineer",
+    "Product Manager", "Project Manager", "QA Engineer", "Security Analyst",
+    "Cloud Architect", "Systems Architect", "Mobile Developer", "UI/UX Designer"
+  ];
+  let primaryRole = "Professional";
+  for (const r of roles) {
+    if (new RegExp(`\\b${r}\\b`, "i").test(resumeText)) {
+      primaryRole = r;
+      break;
+    }
+  }
+
+  // 3. Education
+  const eduKeywords = [
+    "Master of Science", "M.Tech", "M.S.", "Bachelor of Technology",
+    "B.Tech", "Bachelor of Engineering", "B.E.", "B.S.", "Bachelor of Science",
+    "MBA", "MCA", "BCA", "Ph.D.", "Diploma in Engineering"
+  ];
+  let detectedEducation = "Higher Education Degree";
+  for (const edu of eduKeywords) {
+    if (new RegExp(`\\b${edu}\\b`, "i").test(resumeText)) {
+      detectedEducation = edu;
+      break;
+    }
+  }
+
+  // 4. Detected Corporate Employers
+  const segments = lower.split(/[.;,\n]/);
+  const corporateSegments = segments.filter(
+    (seg) => !/\b(intern|internship|interned|trainee|fresher|student|class of)\b/.test(seg)
+  );
+  const corporateText = corporateSegments.join(" ");
+
+  // Strip URLs, social profiles (linkedin.com, github.com), and emails before employer extraction
+  const sanitizedCorporateText = corporateText
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/(?:linkedin|github|twitter|gitlab|medium)\.com\/\S+/gi, " ")
+    .replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi, " ");
+
+  const employers = new Set<string>();
+
+  for (const comp of RECOGNIZED_COMPANIES) {
+    // Avoid treating social portfolio platforms as employers unless explicitly paired with a role
+    if (comp === "linkedin" || comp === "github") {
+      const rolePattern = new RegExp(`(?:at|with|for|engineer|developer|manager)\\s+${comp}\\b|\\b${comp}\\s+(?:employee|team|corp|technologies)`, "i");
+      if (rolePattern.test(sanitizedCorporateText)) {
+        employers.add(comp);
+      }
+      continue;
+    }
+
+    if (new RegExp(`\\b${comp}\\b`, "i").test(sanitizedCorporateText)) {
+      employers.add(comp.replace(/\s+/g, ""));
+    }
+  }
+
+  const regexes = [
+    /(?:worked|employed|working|serving)\s+(?:at|for|with|in)\s+([a-z0-9&.\-_]{3,20})/gi,
+    /(?:software engineer|developer|manager|analyst|architect|designer|svp|vp|director|ceo|cto|cfo)\s+(?:at|for|with|in)\s+([a-z0-9&.\-_]{3,20})/gi,
+    /(?:company|employer|organization)\s*[:=\-–]\s*([a-z0-9&.\-_]{3,20})/gi,
+  ];
+
+  for (const reg of regexes) {
+    let m: RegExpExecArray | null;
+    while ((m = reg.exec(sanitizedCorporateText)) !== null) {
+      const cleaned = m[1].toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (cleaned.length >= 3 && !NON_COMPANY_WORDS.has(cleaned) && cleaned !== "github" && cleaned !== "linkedin") {
+        employers.add(cleaned);
+      }
+    }
+  }
+
+  // 5. Estimated Years
+  const years = (resumeText.match(/\b(19\d\d|20\d\d)\b/g) || []).map(Number);
+  let estimatedYears = 0;
+  if (years.length >= 2) {
+    const validYears = years.filter(y => y >= 2000 && y <= 2026);
+    if (validYears.length >= 2) {
+      estimatedYears = Math.min(25, Math.max(0, Math.max(...validYears) - Math.min(...validYears)));
+    }
+  }
+
+  return {
+    candidateName,
+    primaryRole,
+    detectedEmployers: Array.from(employers),
+    detectedEducation,
+    estimatedExperienceYears: estimatedYears,
+  };
 }
 
 /**
  * POST /api/scanResume
- * body: walletAddress, claimedExperience (string), pdf file
+ * Multi-part form: walletAddress, resume (PDF file), claimedExperience (optional string)
  */
 router.post(
   "/",
@@ -151,79 +245,191 @@ router.post(
   async (req, res, next) => {
     try {
       const walletAddress = requireWalletAddress(req.body.walletAddress, "walletAddress");
-      const claimedExperience = requireText(req.body.claimedExperience, "claimedExperience", {
-        min: 10,
-        max: 2000
-      });
 
       if (!req.file) {
         throw new AppError("Resume PDF is required.", 400);
       }
 
+      // Extract text from PDF
       const resumeText = await extractResumeText(req.file);
-      const onChainHistory = await getEmployeeHistory(walletAddress);
 
-      const hasOnChainRecords = onChainHistory.length > 0;
-      const isVerified = hasOnChainRecords && isClaimVerifiedByOnChainRecords(claimedExperience, onChainHistory);
-      const claimCount = countSpecificEmploymentClaims(claimedExperience);
+      // Parse candidate profile entities directly from resume PDF
+      const extractedProfile = parseResumeEntities(resumeText);
 
-      // Determine mismatches for AI model
-      let mismatches = 0;
-      if (!hasOnChainRecords) {
-        mismatches = claimCount;
-      } else if (!isVerified) {
-        mismatches = 1;
+      // Claimed experience: user-provided text OR auto-synthesized from PDF profile
+      let claimedExperience = typeof req.body.claimedExperience === "string" ? req.body.claimedExperience.trim() : "";
+      if (claimedExperience.length < 5) {
+        if (extractedProfile.detectedEmployers.length > 0) {
+          claimedExperience = `Professional experience in ${extractedProfile.primaryRole} at ${extractedProfile.detectedEmployers.map(c => c.toUpperCase()).join(", ")}.`;
+        } else {
+          claimedExperience = `Entry-level candidate profile in ${extractedProfile.primaryRole} with background in ${extractedProfile.detectedEducation}.`;
+        }
       }
 
-      const aiResult = await getFraudScore(resumeText, claimedExperience, mismatches);
+      // Fetch on-chain history for candidate wallet
+      const onChainHistory = await getEmployeeHistory(walletAddress);
 
-      let finalFraudProbability = 0;
-      let finalExplanation = "";
+      // Extract on-chain company names
+      const onChainCompanyNames: string[] = [];
+      for (const job of onChainHistory) {
+        const comp = extractCompanyFromJobDetails(job.jobDetails);
+        if (comp) {
+          onChainCompanyNames.push(comp);
+        }
+      }
+
+      // Combine user claimed experience text + extracted resume employers
+      const combinedClaimText = `${claimedExperience} ${resumeText}`.toLowerCase();
+      const allClaimedEmployers = new Set<string>(extractedProfile.detectedEmployers);
+
+      for (const comp of RECOGNIZED_COMPANIES) {
+        if (new RegExp(`\\b${comp}\\b`, "i").test(claimedExperience.toLowerCase())) {
+          allClaimedEmployers.add(comp.replace(/\s+/g, ""));
+        }
+      }
+
+      const claimedEmployersList = Array.from(allClaimedEmployers);
+      const totalClaims = claimedEmployersList.length;
+
+      // Cross-reference claims against on-chain records
+      const verifiedEmployers = new Set<string>();
+      for (const onComp of onChainCompanyNames) {
+        if (
+          claimedEmployersList.includes(onComp) ||
+          combinedClaimText.includes(onComp)
+        ) {
+          verifiedEmployers.add(onComp);
+        }
+      }
+
+      const hasOnChainRecords = onChainHistory.length > 0;
+      const verifiedClaims = totalClaims === 0 ? 0 : Math.min(totalClaims, verifiedEmployers.size);
+      const unverifiedClaims = Math.max(0, totalClaims - verifiedClaims);
+
+      // Determine Blockchain Verification Status & Diagnostics
+      let blockchainStatus: "verified" | "partial" | "mismatch" | "no_records";
+      let blockchainSignal = 0.0;
+      const riskSignals: string[] = [];
+      const explanationParts: string[] = [];
 
       if (hasOnChainRecords) {
-        if (isVerified) {
-          // Cryptographically verified on blockchain by employer: ALWAYS 0% Fraud
-          finalFraudProbability = 0;
-          finalExplanation =
-            `Verified on-chain: 0% fraud risk. All claimed experience matches ` +
-            `${onChainHistory.length} cryptographic record(s) verified by employer(s).`;
+        if (totalClaims === 0) {
+          blockchainStatus = "verified";
+          blockchainSignal = 0.05;
+          const comps = onChainCompanyNames.map(c => c.toUpperCase()).join(", ") || "verified employer";
+          riskSignals.unshift(`✓ Verified on-chain credentials held (${comps})`);
+          explanationParts.push(`Candidate wallet holds ${onChainHistory.length} employer-signed on-chain record(s) (${comps}). Profile is consistent with entry-level or junior credentials.`);
+        } else if (verifiedClaims === totalClaims && totalClaims > 0) {
+          blockchainStatus = "verified";
+          blockchainSignal = 0.05;
+          const comps = Array.from(verifiedEmployers).map(c => c.toUpperCase()).join(", ");
+          riskSignals.unshift(`✓ All claimed employer(s) verified on-chain (${comps})`);
+          explanationParts.push(`All ${totalClaims} claimed employment position(s) are cryptographically verified by employer-signed blockchain credentials.`);
+        } else if (verifiedClaims > 0) {
+          blockchainStatus = "partial";
+          blockchainSignal = 0.40;
+          const vComps = Array.from(verifiedEmployers).map(c => c.toUpperCase()).join(", ");
+          riskSignals.push(`⚠ Partial verification: ${verifiedClaims} of ${totalClaims} claimed employer(s) verified on-chain (${vComps}). ${unverifiedClaims} position(s) unverified.`);
+          explanationParts.push(`Partial on-chain verification: ${verifiedClaims} of ${totalClaims} claimed employer(s) confirmed on-chain, but ${unverifiedClaims} position(s) have no blockchain record.`);
         } else {
-          // Blockchain records exist but candidate claims employment that DOES NOT match them
-          finalFraudProbability = 1.0;
-          finalExplanation =
-            `100% Fraud Detected: Critical mismatch with blockchain employment records. ` +
-            `Candidate claims employment that contradicts or does not match their ` +
-            `${onChainHistory.length} verified on-chain record(s).`;
+          blockchainStatus = "mismatch";
+          blockchainSignal = 0.72;
+          const onChainStr = onChainCompanyNames.map(c => c.toUpperCase()).join(", ") || "different employer";
+          const claimedStr = claimedEmployersList.map(c => c.toUpperCase()).join(", ") || "claimed positions";
+          riskSignals.push(`⚠ Blockchain Mismatch: Resume claims (${claimedStr}), but wallet only holds records for (${onChainStr})`);
+          explanationParts.push(`Blockchain mismatch: Candidate claims experience at ${claimedStr}, but the provided wallet only holds records for ${onChainStr}.`);
         }
       } else {
-        // Zero on-chain records exist for this wallet
-        if (claimCount > 0) {
-          // Candidate claims specific corporate employment, but has 0 records proving they worked there
-          finalFraudProbability = 1.0;
-          finalExplanation =
-            `100% Fraud Detected: No blockchain-verified employment records found for this candidate. ` +
-            `The candidate claims ${claimCount} specific past employment position(s), but there is zero ` +
-            `cryptographic verification on-chain confirming they worked there.`;
+        blockchainStatus = "no_records";
+        if (totalClaims === 0) {
+          blockchainSignal = 0.0;
+          explanationParts.push("No on-chain records exist for this wallet.");
         } else {
-          // Entry-level fresher with no corporate claims
-          if (aiResult.fraud_probability >= 0.8) {
-            finalFraudProbability = 1.0;
-            finalExplanation =
-              `100% Fraud Detected: AI analysis identified severe fraudulent patterns, ` +
-              `impossible career timelines, or fabricated credentials in the resume text.`;
-          } else {
-            finalFraudProbability = aiResult.fraud_probability;
-            finalExplanation =
-              `No on-chain corporate records found. Candidate is an entry-level applicant with no ` +
-              `previous employment claims. AI text analysis indicates low fraud risk (${Math.round(aiResult.fraud_probability * 100)}%).`;
+          // Unverified corporate claim signal: calibrated scale
+          blockchainSignal = Math.min(0.65, 0.28 + totalClaims * 0.07);
+          riskSignals.push(`⚠ ${totalClaims} corporate employment claim(s) found with zero blockchain verification on this wallet`);
+          explanationParts.push(`No on-chain records exist for this wallet. The candidate makes ${totalClaims} specific corporate employment claim(s) that cannot be cryptographically verified via blockchain.`);
+        }
+      }
+
+      // Query AI Fraud Detection Service
+      const aiResult = await getFraudScore(resumeText, claimedExperience, unverifiedClaims);
+      const aiScore = aiResult.fraud_probability;
+
+      // Only add positive entry-level message if AI text confirms authentic clean profile
+      if (!hasOnChainRecords && totalClaims === 0 && aiScore < 0.25) {
+        riskSignals.push("✓ Profile evaluated as entry-level / academic background with no unverified corporate claims");
+        explanationParts.unshift("Candidate profile is consistent with an entry-level or fresher applicant with project and academic credentials.");
+      }
+
+      // Merge AI risk signals
+      if (Array.isArray(aiResult.risk_signals)) {
+        for (const sig of aiResult.risk_signals) {
+          if (!riskSignals.includes(sig)) {
+            riskSignals.push(sig);
           }
         }
       }
 
+      // ── Calibrated Composite Scoring ──────────────────────────────────────
+      let finalFraudProbability: number;
+
+      if (hasOnChainRecords) {
+        if (verifiedClaims === totalClaims && totalClaims > 0) {
+          // Authoritative verification: 80% blockchain verified (0.05), 20% AI
+          finalFraudProbability = 0.80 * blockchainSignal + 0.20 * aiScore;
+        } else if (verifiedClaims === 0 && totalClaims > 0) {
+          // Mismatch: 65% blockchain mismatch, 35% AI
+          finalFraudProbability = 0.65 * blockchainSignal + 0.35 * aiScore;
+        } else {
+          // Partial or fresher with records
+          finalFraudProbability = 0.60 * blockchainSignal + 0.40 * aiScore;
+        }
+      } else if (totalClaims > 0) {
+        // No records + specific corporate claims: 45% unverifiable claim signal, 55% AI
+        // If manual claim was provided but omitted all detected employers, add slight discrepancy factor
+        const claimMismatchPenalty = (
+          claimedExperience.length >= 10 &&
+          allClaimedEmployers.size > 0 &&
+          !Array.from(allClaimedEmployers).some(c => claimedExperience.toLowerCase().includes(c))
+        ) ? 0.05 : 0.0;
+
+        // If resume text indicates a career gap without explanation, note slight review factor
+        const careerGapFactor = (/career break|career gap|sabbatical/i.test(resumeText)) ? 0.05 : 0.0;
+
+        finalFraudProbability = 0.45 * blockchainSignal + 0.55 * aiScore + claimMismatchPenalty + careerGapFactor;
+      } else {
+        // Entry-level / fresher: AI text is primary
+        finalFraudProbability = aiScore;
+      }
+
+      finalFraudProbability = Math.round(Math.min(0.98, Math.max(0.04, finalFraudProbability)) * 100) / 100;
+
+      // Risk level categorization
+      let riskLevel: string;
+      if (finalFraudProbability < 0.25)      riskLevel = "Low Risk";
+      else if (finalFraudProbability < 0.50) riskLevel = "Moderate Risk";
+      else if (finalFraudProbability < 0.75) riskLevel = "High Risk";
+      else                                    riskLevel = "Critical Risk";
+
+      if (aiResult.explanation) {
+        explanationParts.push(`AI Analysis: ${aiResult.explanation}`);
+      }
+
+      const finalExplanation = explanationParts.join(" ");
+
       res.json({
         fraudProbability: finalFraudProbability,
+        riskLevel,
+        blockchainStatus,
+        aiTextScore: Math.round(aiScore * 100) / 100,
+        verifiedClaims,
+        totalClaims,
+        riskSignals,
         explanation: finalExplanation,
-        onChainJobs: onChainHistory
+        onChainJobs: onChainHistory,
+        extractedProfile,
+        aiDimensions: aiResult.dimensions,
       });
     } catch (err) {
       next(err);

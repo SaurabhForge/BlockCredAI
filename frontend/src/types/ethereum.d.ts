@@ -1,12 +1,18 @@
 type EthereumRequest = {
   method: string;
-  params?: unknown[];
+  params?: unknown[] | Record<string, unknown>;
 };
 
-interface EthereumProvider {
+export interface EthereumProvider {
+  isMetaMask?: boolean;
+  providers?: EthereumProvider[];
   request<T = unknown>(request: EthereumRequest): Promise<T>;
+  on?(event: string, callback: (...args: any[]) => void): void;
+  removeListener?(event: string, callback: (...args: any[]) => void): void;
 }
 
-interface Window {
-  ethereum?: EthereumProvider;
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider;
+  }
 }
