@@ -4,8 +4,11 @@ import './globals.css';
 import ExtensionErrorHandler from '../components/ExtensionErrorHandler';
 
 export const metadata: Metadata = {
-  title: 'BlockCredAI - Decentralized Employment Verification',
+  title: 'BlockCredAI — Trustless Employment Verification Engine',
   description: 'Blockchain-based employment verification with AI fraud detection',
+  icons: {
+    icon: '/icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -14,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         {/* Intercept external extension unhandled rejections during capture phase before Turbopack dev overlay */}
         <Script
@@ -44,7 +47,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-gray-900 text-white">
+      <body className="bg-[#080610] text-white selection:bg-purple-500/30 selection:text-white min-h-screen">
         <ExtensionErrorHandler />
         {children}
       </body>
