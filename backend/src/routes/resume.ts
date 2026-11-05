@@ -185,17 +185,34 @@ function parseResumeEntities(resumeText: string): ExtractedProfile {
 
   const employers = new Set<string>();
 
+  // Employment-context words that must appear near a company name for it to count as an employer.
+  // Bare mentions in Skills/Tools sections ("AWS", "Microsoft Azure", "Google Cloud") are ignored.
+  const EMPLOYMENT_CONTEXT = [
+    "at", "for", "with", "joined", "worked", "working", "employed",
+    "engineer at", "developer at", "analyst at", "manager at", "director at",
+    "intern at", "consultant at", "lead at", "associate at", "architect at",
+  ];
+  const ctxPattern = EMPLOYMENT_CONTEXT.map(w => w.replace(/\s/g, "\\s+")).join("|");
+  // Builds: /(?:at|for|with|...) {0,15} COMPANY | COMPANY {0,15} (?:at|for|...)/i
+  function isEmployerContext(text: string, company: string): boolean {
+    const esc = company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return (
+      new RegExp(`(?:${ctxPattern})\\s{0,3}${esc}\\b`, "i").test(text) ||
+      new RegExp(`\\b${esc}\\s{0,3}(?:employee|team|corp|technologies|inc|ltd|llc)`, "i").test(text)
+    );
+  }
+
   for (const comp of RECOGNIZED_COMPANIES) {
-    // Avoid treating social portfolio platforms as employers unless explicitly paired with a role
+    // Social platforms: only count as employer if explicit role context present
     if (comp === "linkedin" || comp === "github") {
-      const rolePattern = new RegExp(`(?:at|with|for|engineer|developer|manager)\\s+${comp}\\b|\\b${comp}\\s+(?:employee|team|corp|technologies)`, "i");
-      if (rolePattern.test(sanitizedCorporateText)) {
+      if (isEmployerContext(sanitizedCorporateText, comp)) {
         employers.add(comp);
       }
       continue;
     }
 
-    if (new RegExp(`\\b${comp}\\b`, "i").test(sanitizedCorporateText)) {
+    // All other companies: must appear in employment context, not just as a tool/skill mention
+    if (isEmployerContext(sanitizedCorporateText, comp)) {
       employers.add(comp.replace(/\s+/g, ""));
     }
   }
