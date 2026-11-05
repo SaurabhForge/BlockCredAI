@@ -21,6 +21,7 @@ type ExtractedProfile = {
   detectedEmployers: string[];
   detectedEducation: string;
   estimatedExperienceYears: number;
+  manualClaim?: string;
 };
 
 type AiDimensions = {
@@ -289,8 +290,14 @@ export default function ResumeUpload() {
                       {result.extractedProfile.detectedEducation}
                     </p>
                   </div>
+                  {result.extractedProfile.manualClaim && (
+                    <div className="sm:col-span-2">
+                      <span className="text-amber-400 font-semibold">Claimed Experience (Manual Input):</span>
+                      <p className="text-amber-200 mt-0.5 italic">{result.extractedProfile.manualClaim}</p>
+                    </div>
+                  )}
                   <div className="sm:col-span-2">
-                    <span className="text-gray-400">Corporate Experience Detected:</span>
+                    <span className="text-gray-400">Corporate Experience Detected in PDF:</span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {result.extractedProfile.detectedEmployers.length > 0 ? (
                         result.extractedProfile.detectedEmployers.map((emp, i) => (
