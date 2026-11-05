@@ -356,50 +356,7 @@ export default function ResumeUpload() {
               <ScoreBar label="Composite Multimodal Fraud Score" value={result.fraudProbability} barColor={risk.color} />
             </div>
 
-            {/* AI Diagnostics Sub-Metrics */}
-            {result.aiDimensions && (
-              <div className="p-4 rounded-xl bg-black/25 border border-white/5 space-y-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">AI Diagnostic Integrity</p>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <div className="flex justify-between text-gray-400 mb-1">
-                      <span>Timeline Integrity</span>
-                      <span className="text-emerald-400 font-bold">{Math.round((result.aiDimensions.timeline_integrity ?? 0.95) * 100)}%</span>
-                    </div>
-                    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(result.aiDimensions.timeline_integrity ?? 0.95) * 100}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-gray-400 mb-1">
-                      <span>Seniority Plausibility</span>
-                      <span className="text-emerald-400 font-bold">{Math.round((result.aiDimensions.seniority_alignment ?? 0.95) * 100)}%</span>
-                    </div>
-                    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(result.aiDimensions.seniority_alignment ?? 0.95) * 100}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-gray-400 mb-1">
-                      <span>Metrics Credibility</span>
-                      <span className="text-emerald-400 font-bold">{Math.round((result.aiDimensions.metrics_credibility ?? 0.95) * 100)}%</span>
-                    </div>
-                    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(result.aiDimensions.metrics_credibility ?? 0.95) * 100}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-gray-400 mb-1">
-                      <span>Skill Authenticity</span>
-                      <span className="text-emerald-400 font-bold">{Math.round((result.aiDimensions.skill_authenticity ?? 0.95) * 100)}%</span>
-                    </div>
-                    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(result.aiDimensions.skill_authenticity ?? 0.95) * 100}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* Risk Signals */}
             {result.riskSignals && result.riskSignals.length > 0 && (
